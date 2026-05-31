@@ -1,0 +1,222 @@
+
+Here's the cleaned version with all passwords removed:
+
+---
+
+```markdown
+# Linux User & Group Management — KodeKloud Practice
+
+> **Category:** Linux System Administration  
+> **Platform:** KodeKloud — Stratos Datacenter  
+> **Date:** May 31, 2026  
+> **Topics:** User Management, Group Management, Shell Configuration
+
+---
+
+## Stratos Datacenter — Server Reference
+
+| Server | Hostname | SSH User |
+|--------|----------|----------|
+| App Server 1 | stapp01 | tony |
+| App Server 2 | stapp02 | amelia |
+| App Server 3 | stapp03 | banner |
+| Jump Host | thor | thor |
+
+---
+
+## Task 1: Create a Custom Apache User with Specific UID & Home Directory
+
+### Problem Statement
+Create a user named `anita` on **App Server 2** with:
+- UID: `1280`
+- Home Directory: `/var/www/anita`
+
+### Steps
+
+**1. SSH into App Server 2:**
+```bash
+ssh amelia@stapp02
+```
+
+**2. Create the user:**
+```bash
+sudo useradd -u 1280 -d /var/www/anita anita
+```
+
+**3. Set a password (if required):**
+```bash
+sudo passwd anita
+```
+
+**4. Verify:**
+```bash
+id anita
+grep anita /etc/passwd
+```
+
+**Expected output:**
+```
+uid=1280(anita) gid=1280(anita) groups=1280(anita)
+anita:x:1280:1280::/var/www/anita:/bin/bash
+```
+
+### Key Flags
+| Flag | Purpose |
+|------|---------|
+| `-u 1280` | Assigns UID 1280 to the user |
+| `-d /var/www/anita` | Sets the home directory path in `/etc/passwd` (does not create it) |
+| `-m` | Use this if you want the home directory to be physically created |
+
+---
+
+## Task 2: Create a Group and Add a User Across All App Servers
+
+### Problem Statement
+- Create a group named `nautilus_developers` on **all 3 App servers**
+- Add user `mohammed` to the group (create the user if it doesn't exist)
+
+### Steps (repeat on each server)
+
+**SSH into each server:**
+```bash
+ssh tony@stapp01
+ssh amelia@stapp02
+ssh banner@stapp03
+```
+
+**Safe one-liner (handles both new and existing user):**
+```bash
+sudo groupadd nautilus_developers 2>/dev/null; \
+id mohammed &>/dev/null \
+  && sudo usermod -aG nautilus_developers mohammed \
+  || sudo useradd -G nautilus_developers mohammed
+```
+
+**Or step-by-step:**
+```bash
+sudo groupadd nautilus_developers
+
+# If user does NOT exist:
+sudo useradd -G nautilus_developers mohammed
+
+# If user already EXISTS:
+sudo usermod -aG nautilus_developers mohammed
+```
+
+**Verify:**
+```bash
+getent group nautilus_developers
+id mohammed
+```
+
+**Expected output:**
+```
+nautilus_developers:x:<GID>:mohammed
+uid=<UID>(mohammed) gid=<GID>(mohammed) groups=<GID>(mohammed),<GID>(nautilus_developers)
+```
+
+### Key Flags
+| Flag | Purpose |
+|------|---------|
+| `groupadd` | Creates a new group |
+| `-G <group>` | Assigns primary/supplementary group at user creation |
+| `usermod -aG` | Appends user to a group without removing from existing groups |
+| `2>/dev/null` | Suppresses error if group already exists |
+
+---
+
+## Task 3: Create a User with a Non-Interactive Shell
+
+### Problem Statement
+Create a user named `yousuf` with a **non-interactive shell** on **App Server 3**.  
+(Required by a backup agent tool that needs a system account without login access.)
+
+### Steps
+
+**1. SSH into App Server 3:**
+```bash
+ssh banner@stapp03
+```
+
+**2. Create the user with `/sbin/nologin`:**
+```bash
+sudo useradd -s /sbin/nologin yousuf
+```
+
+**3. Verify:**
+```bash
+grep yousuf /etc/passwd
+```
+
+**Expected output:**
+```
+yousuf:x:<UID>:<GID>::/home/yousuf:/sbin/nologin
+```
+
+### Key Flag
+| Flag | Purpose |
+|------|---------|
+| `-s /sbin/nologin` | Sets the shell to non-interactive (user cannot log in) |
+
+---
+
+## Concept: `/sbin/nologin` Users & Home Directories
+
+### Do you need a home directory for a `/sbin/nologin` user?
+
+**No — generally not needed.**
+
+| Use Case | Home Dir Needed? |
+|----------|-----------------|
+| Regular interactive login user | Yes (`-m` flag) |
+| `/sbin/nologin` system/service account | No |
+| Web app user (e.g., Apache) | Only if app needs a dir to store files |
+| Daemon user (nginx, mysql, etc.) | Sometimes (for app data) |
+
+### Why?
+- `/sbin/nologin` users **cannot start an interactive shell session**
+- No shell session = no need for `~/.bashrc`, `~/.profile`, etc.
+- The `-d` flag in `useradd` only **records** the path in `/etc/passwd` — it does not physically create the directory
+- Use `-m` only when the directory needs to be created on disk
+
+### Example — service user without home dir:
+```bash
+sudo useradd -M -s /sbin/nologin serviceaccount
+```
+
+| Flag | Meaning |
+|------|---------|
+| `-M` | Do NOT create home directory |
+| `-s /sbin/nologin` | Non-interactive shell |
+
+---
+
+## Quick Reference — Common `useradd` Flags
+
+| Flag | Description |
+|------|-------------|
+| `-u <UID>` | Set specific User ID |
+| `-g <group>` | Set primary group |
+| `-G <groups>` | Set supplementary groups |
+| `-d <dir>` | Set home directory path |
+| `-m` | Create home directory |
+| `-M` | Do NOT create home directory |
+| `-s <shell>` | Set login shell |
+| `-c <comment>` | Add a comment/description |
+| `-r` | Create a system account |
+
+---
+
+## Quick Reference — Common `usermod` Flags
+
+| Flag | Description |
+|------|-------------|
+| `-aG <group>` | Append user to a group (safe — doesn't remove existing groups) |
+| `-s <shell>` | Change login shell |
+| `-d <dir>` | Change home directory |
+| `-u <UID>` | Change UID |
+| `-l <name>` | Change username |
+| `-L` | Lock the user account |
+| `-U` | Unlock the user account |
+
+
